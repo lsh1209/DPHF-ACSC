@@ -100,6 +100,7 @@ regions<-region_16_20%>%
     NAME %in% c("Washington", "Oregon") ~ "West",
     NAME %in% c("Wisconsin", "Minnesota", "Iowa", "Missouri","Nebraska") ~ "Midwest"))
 
+#FOR THE YEAR DATA
 regions_census<-regions%>%
   group_by(Year, Region)%>%
   mutate(
@@ -120,8 +121,7 @@ regions_census<-regions%>%
     age_75_plus_year_r
   )
 
-
-load("cleaned_data_age_race_sex_ins_merged.RData")
+#CLEAN DATA AND ADD VARIABLES FOR EASIER CODING
 cleaned_data<-cleaned_data_age_race_sex_ins_merged%>%
   select(State, Year, `Age Cat.`,`ACSC Hospitalization`, `Acute Hospitalization`, 
           `Chronic Hospitalization`, `Diabetes Hospitalization`, standard_age_population)%>%
@@ -149,7 +149,8 @@ cleaned_data_merged1<-cleaned_data_merged%>%
     -age_67_74_year_r,
     -age_75_plus_year_r
   )
-# Step 1: Calculate hospitalizations and age populations at the regional level
+#RATE CALCULATION
+# Step 1: Calculate hospitalizations and age populations at the regional (PER YEAR) level
 cases_by_age_region <- cleaned_data_merged1 %>%
   group_by(Year, Region, `Age Cat.`, age_population, standard_age_population) %>% 
   summarise(
@@ -234,7 +235,7 @@ final_rates_region_age1=final_rates_region_age1%>%
     -standard_age_population
   )
 
-
+#MERGING
 cleaned_data_age_race_sex_ins_reg_<-cleaned_data_merged1%>%
   left_join(final_rates_region_age1, by=c("Year","Age Cat.","Region"))%>%
   select(
@@ -243,7 +244,6 @@ cleaned_data_age_race_sex_ins_reg_<-cleaned_data_merged1%>%
 
 colnames(cleaned_data_age_race_sex_ins_merged)
 colnames(cleaned_data_age_race_sex_ins_reg_)
-
 
 cleaned_data_age_race_sex_ins_reg_ <- cleaned_data_age_race_sex_ins_reg_ %>%
   distinct(State, Year, Region, `Age Cat.`, `ACSC Hospitalization`, `Acute Hospitalization`,
@@ -318,7 +318,7 @@ regions_censusw<-regionsw%>%
     age_45_66_year_r
   )
 
-load("cleaned_data_age_race_sex_ins_mergedw.RData")
+#CLEANING DATA 
 
 cleaned_dataw<-cleaned_data_age_race_sex_ins_mergedw%>%
   select(State, Year, `Age Cat.`,`ACSC Hospitalization`, `Acute Hospitalization`, 
@@ -343,6 +343,7 @@ cleaned_data_merged1w<-cleaned_data_mergedw%>%
     -age_30_44_year_r,
     -age_45_66_year_r
   )
+#RATE CALCULATION
 # Step 1: Calculate hospitalizations and age populations at the regional level
 cases_by_age_regionw <- cleaned_data_merged1w %>%
   group_by(Year, Region, `Age Cat.`, age_population, standard_age_population) %>% 
@@ -434,10 +435,9 @@ cleaned_data_age_race_sex_ins_reg_w<-cleaned_data_merged1w%>%
   select(
     -age_population,
     -standard_age_population)
-
+#MERGING 
 colnames(cleaned_data_age_race_sex_mergedw)
 colnames(cleaned_data_age_race_sex_ins_reg_w)
-
 
 cleaned_data_age_race_sex_ins_reg_w <- cleaned_data_age_race_sex_ins_reg_w %>%
   distinct(State, Year, Region, `Age Cat.`, `ACSC Hospitalization`, `Acute Hospitalization`,

@@ -12,41 +12,7 @@ library(openxlsx)
 #LOAD CLEANED DATASET FROM CLEANED_DATA.R
 load("cleaned_data_1.RData")
 
-#CLEAN DATA FOR YEARS and OUTCOMES
-cleaned_data_filtered <- cleaned_data %>%
-  ungroup() %>% 
-  filter(Year1 %in% 2016:2021) %>%
-  filter(tapq90 == 1 | tapq91 == 1 | tapq92 == 1 | tapq93 == 1) %>%
-  select(patient_county, HOSPST, Year1, AGE, popagecat, sexcat, race_label, 
-         pay_label, tapq90, tapq91, tapq92, tapq93)
-cleaned_data_filtered=cleaned_data_filtered%>%
-  mutate(
-    Age= as.numeric(AGE))
-
-cleaned_data_filtered1 = cleaned_data_filtered%>%
-  rename(
-    "State"= HOSPST,
-    "Year" = Year1,
-    "FIPS"= patient_county,
-    "Age"= Age,
-    "Age Cat."= popagecat,
-    "Sex"=sexcat,
-    "Race"=race_label,
-    "Insurance Type" = pay_label,
-    "ACSC Hospitalization"= tapq90,
-    "Acute Hospitalization"=tapq91,
-    "Chronic Hospitalization"=tapq92,
-    "Diabetes Hospitalization"=tapq93)%>%
-  select(
-    - AGE)
-save(cleaned_data_filtered1, file="cleaned_data_1.RData")
-
-
-##Remove Age for Merging
-cleaned_data_filtered2<- cleaned_data_filtered1%>%
-  select(
-    -Age)
-
+##CHANGE STATE NAME FOR EASIER MERGING
 cleaned_data_filtered2<-cleaned_data_filtered1%>%
   mutate(State = recode(State,
                         "AZ" = "Arizona",
@@ -62,18 +28,17 @@ cleaned_data_filtered2<-cleaned_data_filtered1%>%
                         "OR" = "Oregon",
                         "WA" = "Washington",
                         "WI" = "Wisconsin"))
-save(cleaned_data_filtered3, file="cleaned_data_3.RData")
-load("cleaned_data_3.RData")
-##Attach Census information
+
+##LOAD CENSUS INFORMATION
 census_data_all<- read_xlsx("census_data_county_all.xlsx")
 
 ##MERGE
-colnames(cleaned_data_filtered3)
+colnames(cleaned_data_filtered2)
 colnames(census_data_all)
 
 cleaned_merged_data <- left_join(census_data_all, cleaned_data_filtered2, by = c("GEOID"= "FIPS", "State" = "State", "Year"="Year"))
 
-##FUTHER CLEAN AFTER MERGE
+##FURTHER CLEAN AFTER MERGE (CREATING NEW VARIABLES TO SUMMARIZE DATA) 
 cleaned_merged_data1 <- cleaned_merged_data %>%
   mutate(
     standard_age_population = case_when(
@@ -115,7 +80,7 @@ cleaned_merged_data2<-cleaned_merged_data1%>%
     -Age_67_74_00,
     -Age_75_plus_00,
     -total_population_00,
-    - age_18_29_state,
+    -age_18_29_state,
     -age_30_44_state,
     -age_45_66,
     -age_67_74_state,
@@ -173,17 +138,18 @@ cleaned_merged_data4 <- cleaned_merged_data3%>%
    - female_pop_state,
    -male_pop_state)
 cleaned_merged_final<-cleaned_merged_data4%>%
-  select(GEOID, County, State, Year,Age, `Age Cat.`, Sex, Race, `Insurance Type`, `ACSC Hospitalization`,
+  select(GEOID, County, State, Year, Age, `Age Cat.`, Sex, Race, `Insurance Type`, `ACSC Hospitalization`,
          `Acute Hospitalization`, `Chronic Hospitalization`, `Diabetes Hospitalization`, 
          total_population, total_population_state, age_population_county,
          age_population_state, standard_age_population,
          sex_population_county, sex_population_state,
          race_population_county, race_population_state,
-         median_income, median_income_state, Poverty_Rate, Poverty_Rate_state)
+         median_income, median_income_state, Poverty_Rate, Poverty_Rate_state) #KEEPING AGE FOR TABLE ONE INFORMATION
 
 save(cleaned_merged_final,file ="cleaned_merged_final.RData")
 load("cleaned_merged_final.RData")
-#Rate Calculations
+
+#RATE CALCULATIONS
 # Step 1: Calculate hospitalizations and age populations at the county level
 cases_by_age_county <- cleaned_merged_data3 %>%
   group_by(GEOID, County, State, Year, `Age Cat.`, age_population_county, standard_age_population) %>% 
@@ -195,7 +161,7 @@ cases_by_age_county <- cleaned_merged_data3 %>%
     total_standard_age_population = 435079676+27655755+34467220+22688497+25306917, na.rm = TRUE) %>%
   ungroup()
 
-# Step 2: Calculate age-specific rates
+# Step 2: Calculate age-specific rates per each county 
 age_specific_rates <- cases_by_age_county %>%
   mutate( 
     Age_specific_rate_acsc_c = ACSC_Hosp / age_population_county * 1000,
@@ -240,7 +206,7 @@ age_rates_adj <- total_expected_cases %>%
   select(GEOID, County, State, Year, Age_Adjusted_ACSC_Rate_c, Age_Adjusted_Acute_Rate_c, 
          Age_Adjusted_Chronic_Rate_c, Age_Adjusted_Diabetes_Rate_c)
 
-# Step 6: Calculate crude rates at the county level (using total_age_population)
+# Step 6: Calculate crude rates at the county level
 age_rates_crude <- cases_by_age_county %>%
   group_by(GEOID, County, State, Year) %>%
   summarise(
@@ -262,8 +228,8 @@ final_rates_county_age=final_rates_county_age%>%
     -standard_age_population
   )
 
-#Create State rates based on each year
-# Step 1: Aggregate hospitalizations and age populations at state level
+#Create State Rates
+# Step 1: Aggregate hospitalizations and age populations at the state level
 state_data <- cleaned_merged_data3 %>%
   group_by(State, Year, `Age Cat.`, age_population_state, standard_age_population) %>% 
   summarise(
@@ -296,6 +262,7 @@ expected_cases_state <- age_specific_rates_state %>%
   select(State, Year, `Age Cat.`, expected_cases_acsc, 
          expected_cases_acute, expected_cases_chronic, expected_cases_diabetes,
          total_standard_age_population,standard_age_population)
+
 # Step 4: Total expected cases by state
 total_expected_cases_state <- expected_cases_state %>%
   group_by(State, Year) %>%
@@ -459,6 +426,7 @@ year_data<- merged_data_yearfin%>%
     Diabetes_Hosp = sum(`Diabetes Hospitalization`, na.rm = TRUE),
     total_standard_age_population = 435079676+27655755+34467220+22688497+25306917, na.rm = TRUE)
 %>% ungroup
+
 # Step 2: Calculate age-specific rates for each year
 age_specific_rates_year<-year_data %>%
   mutate( 
@@ -470,6 +438,7 @@ age_specific_rates_year<-year_data %>%
   select(Year, `Age Cat.`, Age_specific_rate_acsc_y, Age_specific_rate_acute_y, 
          Age_specific_rate_chronic_y, Age_specific_rate_diabetes_y, 
          age_population_year, total_standard_age_population, standard_age_population)
+
 # Step 3: Expected cases
 expected_cases_year <- age_specific_rates_year %>%
   mutate(
@@ -481,7 +450,8 @@ expected_cases_year <- age_specific_rates_year %>%
   select(Year, `Age Cat.`, expected_cases_acsc, 
          expected_cases_acute, expected_cases_chronic, expected_cases_diabetes,
          total_standard_age_population,standard_age_population)
-# Step 4: Total expected cases by state
+
+# Step 4: Total expected cases by year
 total_expected_cases_year <- expected_cases_year %>%
   group_by(Year) %>%
   summarise(
@@ -526,43 +496,31 @@ final_rates_year_age <- final_rates_year_age %>%
     -standard_age_population
   )
 
+##MERGING ALL RATES TOGETHER TO ONE DATASET
 colnames(final_rates_county_age)
 colnames(final_rates_state_age)
 colnames(final_rates_year_age)
 
-duplicates_county <- final_rates_county_age %>%
-  group_by(State, Year, `Age Cat.`) %>%
-  filter(n() > 1)
-
-view(duplicates_county)
-
-duplicates_state <- final_rates_state_age %>%
-  group_by(State, Year, `Age Cat.`) %>%
-  filter(n() > 1)
-
-view(duplicates_state)
+##ENSURE AN EQUAL MERGE 
 final_rates_county_age_distinct <- final_rates_county_age %>%
   distinct(County, State, Year, `Age Cat.`, .keep_all = TRUE)
 final_rates_state_age_distinct <- final_rates_state_age %>%
   distinct(State, Year, `Age Cat.`, .keep_all = TRUE)
+
+#MERGE ONE
 final_data_age_rates <- final_rates_county_age_distinct %>%
   left_join(final_rates_state_age_distinct, by = c("State", "Year", "Age Cat."))
 
-duplicates_year <- final_rates_year_age %>%
-  group_by( Year, `Age Cat.`) %>%
-  filter(n() > 1)
-
-view(duplicates_year)
 final_rates_year_age_distinct <- final_rates_year_age %>%
   distinct(Year, `Age Cat.`, .keep_all = TRUE)
-
+#FINAL MERGE
 cleaned_data_age_rates_fin<-final_data_age_rates%>%
   left_join(final_rates_year_age_distinct, by=c("Year","Age Cat."))
 
 save(cleaned_data_age_rates_fin, file="cleaned_data_age_final.RData")
 load("cleaned_data_age_final.RData")
 
-#WORK ON WORKING POPULATION DATASET
+#RATES FOR WORKING POPULATION DATASET
 #Working Population Dataset
 cleaned_data_filteredw<-cleaned_data_filtered3%>%
   filter(`Age Cat.`%in% c("18-29","30-44","45-66"))
@@ -795,7 +753,7 @@ age_rates_adjw <- total_expected_casesw %>%
   select(GEOID, County, State, Year, Age_Adjusted_ACSC_Rate_c, Age_Adjusted_Acute_Rate_c, 
          Age_Adjusted_Chronic_Rate_c, Age_Adjusted_Diabetes_Rate_c)
 
-# Step 6: Calculate crude rates at the county level (using total_age_population)
+# Step 6: Calculate crude rates at the county level
 age_rates_crudew <- cases_by_age_countyw %>%
   group_by(GEOID, County, State, Year) %>%
   summarise(
@@ -818,7 +776,7 @@ final_rates_county_agew=final_rates_county_agew%>%
   )
 
 #STATE LEVEL RATES
-# Step 1: Aggregate hospitalizations and age populations at state level
+# Step 1: Aggregate hospitalizations and age populations at the state level
 state_dataw <- cleaned_merged_dataw7 %>%
   group_by(State, Year, `Age Cat.`, age_population_state, standard_age_population) %>% 
   summarise(
@@ -851,6 +809,7 @@ expected_cases_statew <- age_specific_rates_statew %>%
   select(State, Year, `Age Cat.`, expected_cases_acsc, 
          expected_cases_acute, expected_cases_chronic, expected_cases_diabetes,
          total_standard_age_population,standard_age_population)
+
 # Step 4: Total expected cases by state
 total_expected_cases_statew <- expected_cases_statew %>%
   group_by(State, Year) %>%
@@ -896,7 +855,7 @@ final_rates_state_agew <- final_rates_state_agew %>%
     -standard_age_population
   )
 
-#YEAR LEVEL INFROMATION
+#YEAR LEVEL INFORMATION
 # Step 1: Aggregate hospitalizations and age populations at year level
 year_dataw<- cleaned_merged_dataw7%>%
   group_by(Year, `Age Cat.`, age_population_year, standard_age_population) %>% 
@@ -978,32 +937,18 @@ colnames(final_rates_county_agew)
 colnames(final_rates_state_agew)
 colnames(final_rates_year_agew)
 
-duplicates_countyw <- final_rates_county_agew %>%
-  group_by(State, Year, `Age Cat.`) %>%
-  filter(n() > 1)
-
-view(duplicates_countyw)
-
-duplicates_statew <- final_rates_state_agew %>%
-  group_by(State, Year, `Age Cat.`) %>%
-  filter(n() > 1)
-
-view(duplicates_statew)
+#ENSURE EQUAL MERGE
 final_rates_county_age_distinctw <- final_rates_county_agew %>%
   distinct(County, State, Year, `Age Cat.`, .keep_all = TRUE)
 final_rates_state_age_distinctw <- final_rates_state_agew %>%
   distinct(State, Year, `Age Cat.`, .keep_all = TRUE)
+#MERGE ONE
 final_data_age_ratesw <- final_rates_county_age_distinctw %>%
   left_join(final_rates_state_age_distinctw, by = c("State", "Year", "Age Cat."))
 
-duplicates_yearw <- final_rates_year_agew %>%
-  group_by( Year, `Age Cat.`) %>%
-  filter(n() > 1)
-
-view(duplicates_yearw)
 final_rates_year_age_distinctw <- final_rates_year_agew %>%
   distinct(Year, `Age Cat.`, .keep_all = TRUE)
-
+#FINAL MERGE
 cleaned_data_age_rates_finw<-final_data_age_ratesw%>%
   left_join(final_rates_year_age_distinctw, by=c("Year","Age Cat."))
 
@@ -1011,7 +956,7 @@ save(cleaned_data_age_rates_finw, file="cleaned_data_age_finalw.RData")
 load("cleaned_data_age_finalw.RData")
 
 
-#GRAPHS- years (TABLE 1)
+#GRAPHS
 #ACSC
 ggplot(cleaned_data_age_rates_fin, aes(x=Year))+
   geom_line(aes(y=Crude_ACSC_Rate_y,color="Crude Rate"),size=.75)+
@@ -1146,10 +1091,7 @@ ggplot(cleaned_data_age_rates_finw, aes(x=Year))+
   ) +scale_y_continuous(expand=c(0,.1))+
   theme_minimal()
 
-
-
-
-#GRAPHS
+#GRAPHS PT2
 ggplot(cleaned_data_age_rates_fin, aes(x = Year)) +
   geom_line(aes(y = Crude_ACSC_Rate_s, color = "Crude Rate"), size = .75) +
   geom_line(aes(y = Age_Adjusted_ACSC_Rate_s, color = "Age-Adjusted Rate"), size = .75, linetype = "dashed") +
@@ -1456,6 +1398,7 @@ cleaned_data_age_merged<-cleaned_merged_final%>%
   left_join(cleaned_data_age_rates_fin, by=c("GEOID","County","State","Year","Age Cat."))
 save(cleaned_data_age_merged,file="cleaned_data_age_merged.RData")
 load("cleaned_data_age_merged.RData")
+
 #WORKING POPULATION DATASET
 cleaned_data_age_mergedw<-cleaned_merged_dataw7%>%
   left_join(cleaned_data_age_rates_finw, by=c("GEOID","County","State","Year","Age Cat."))

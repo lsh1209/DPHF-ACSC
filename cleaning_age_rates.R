@@ -9,7 +9,9 @@ library(readxl)
 library(scales)
 library(openxlsx)
 
+#LOAD CLEANED DATASET FROM CLEANED_DATA.R
 load("cleaned_data_1.RData")
+
 #CLEAN DATA FOR YEARS and OUTCOMES
 cleaned_data_filtered <- cleaned_data %>%
   ungroup() %>% 

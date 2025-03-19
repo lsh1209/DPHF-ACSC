@@ -1,10 +1,9 @@
-
+##MAIN CODE FOR FINDING CENSUS DATA IS FROM HEATHER
 ##TOTAL POPULATION 
 library(tidyverse)
-
 library(tidycensus)
 
-
+#HEATHER CODE:
 years <- 2016:2020
 states <- c("AZ", "FL", "GA", "KY", "MA", "MN", "NE", "NC", "NJ", "NY", "OR", "WA", "WI")
 b27010_ <- function(var_num) {
@@ -27,8 +26,8 @@ raw_acs_insur_list <- lapply(years, function(acs_year) {
     year = acs_year,
     survey = acs_survey,
     state = states,
-    variables = b27010_(c(1, 18, 20:25, 27:34, 
-                          36:41, 43:51, 53:57, 59:66)) ###Removed under 18 populations
+    variables = b27010_(c(18, 20:25, 27:34, 
+                          36:41, 43:51, 53:57, 59:66)) ###LH: REMOVED UNDER 18 POPULATION 
   )
   
   # Add the year to the dataset
@@ -44,7 +43,7 @@ county_insurance <- raw_acs_insur %>%
   dplyr::mutate(insurance_type = 
                   dplyr::case_when(
                     # TOTAL (DENOMINATOR)
-                    variable %in% b27010_(c(18,34,51)) ~ "ins_denom", ##Makes it the total for 18-34, 35-64, and 65+ 
+                    variable %in% b27010_(c(18,34,51)) ~ "ins_denom", ##MAKES IT THE TOTAL FOR 18-34, 35-64, AND 65+ 
                     # NONE = NO INSURANCE
                     variable %in% b27010_(c(33,50,66)) ~ "ins_none",
                     # MEDICAID ALONE
@@ -71,7 +70,7 @@ county_insurance <- raw_acs_insur %>%
   tidyr::pivot_wider(id_cols = c(GEOID, Year),
                      names_from = insurance_type,
                      values_from = estimate) %>%
-  dplyr::mutate(ins_medicaid_2  = ins_medicaid_alone + ins_both_medicaid_care, ##FIX 
+  dplyr::mutate(ins_medicaid_2  = ins_medicaid_alone + ins_both_medicaid_care, ##LH: CHANGED TO REFLECT MEETING DISCUSSION
                 check_total = ins_denom - 
                   (ins_none + ins_medicaid_alone +  ins_both_medicaid_care +
                      ins_medicare_alone + ins_private + ins_other))
@@ -100,6 +99,7 @@ temp_insurance <- county_insurance %>%
 #MERGE TO MAIN DATASET
 load("cleaned_merged_final.RData")
 
+#KEEP ONLY THE VARIABLES NEEDED FOR CALCULATION AS OF RIGHT NOW
 cleaned_data_1<-cleaned_merged_final%>%
   select(
     GEOID,
@@ -136,6 +136,7 @@ cases_by_insurance_county <- cleaned_data_3 %>%
     Diabetes_Hosp = sum(`Diabetes Hospitalization`, na.rm = TRUE),
   ) %>%
   ungroup()
+
 # Step 2: Calculate insurance-specific rates
 ins_specific_rates <- cases_by_insurance_county %>%
   mutate( 
@@ -146,7 +147,8 @@ ins_specific_rates <- cases_by_insurance_county %>%
   ) %>%
   select(GEOID, County, State, Year, `Insurance Type`, ins_specific_rate_acsc_c, ins_specific_rate_acute_c, 
          ins_specific_rate_chronic_c, ins_specific_rate_diabetes_c, pop_ins)
-# Step 6: Calculate crude rates at the county level 
+
+# Step 3: Calculate crude rates at the county level 
 ins_rates_crude <- cases_by_insurance_county %>%
   group_by(GEOID, County, State, Year) %>%
   summarise(
@@ -157,11 +159,11 @@ ins_rates_crude <- cases_by_insurance_county %>%
   ) %>%
   ungroup()
 
-# Step 7: Combine ins-specific rates, crude rates, and adjusted rates
+# Step 4: Combine ins-specific rates, crude rates, and adjusted rates
 final_rates_county_ins <- ins_rates_crude %>%
   left_join(ins_specific_rates, by = c("GEOID", "County", "State", "Year"))
 
-#YEAR
+#STATE AND YEAR DATA
 # Create a list to store data
 raw_acs_insur_list_state <- lapply(years, function(acs_year) {
   # Use survey_used logic based on the year
@@ -179,8 +181,8 @@ raw_acs_insur_list_state <- lapply(years, function(acs_year) {
     year = acs_year,
     survey = acs_survey,
     state = states,
-    variables = b27010_(c(1, 18 , 20:25, 27:34, 
-                          36:41, 43:51, 53:57, 59:66))
+    variables = b27010_(c(18 , 20:25, 27:34, 
+                          36:41, 43:51, 53:57, 59:66)) #REMOVED UNDER 18 INDIVIDUALS 
   )
   
   # Add the year to the dataset
@@ -252,8 +254,7 @@ temp_insurance_state <- state_insurance %>%
 cleaned_data_4 <- cleaned_data_3 %>%
   left_join(temp_insurance_state, by = c("State"="NAME","Year", "Insurance Type"="insurance_ses"))
 
-
-
+#MERGE DATASETS TOGETHER
 final_rates_insurance_state_distinct <- cleaned_data_4 %>%
   distinct(State, Year, `Insurance Type`, .keep_all = TRUE)
 
@@ -284,6 +285,7 @@ pop_ins_summary<-pop_ins_summary%>%
   rename(
     "GEOID"=GEOID.x
   )
+
 #Rate Calculations
 # Step 1: Calculate hospitalizations and insurance populations at the state level
 cases_by_insurance_state <- pop_ins_summary %>%
@@ -295,6 +297,7 @@ cases_by_insurance_state <- pop_ins_summary %>%
     Diabetes_Hosp = sum(`Diabetes Hospitalization`, na.rm = TRUE),
   ) %>%
   ungroup()
+
 # Step 2: Calculate insurance-specific rates
 ins_specific_rates_state <- cases_by_insurance_state %>%
   mutate( 
@@ -305,7 +308,8 @@ ins_specific_rates_state <- cases_by_insurance_state %>%
   ) %>%
   select(State, Year, `Insurance Type`, ins_specific_rate_acsc_s, ins_specific_rate_acute_s, 
          ins_specific_rate_chronic_s, ins_specific_rate_diabetes_s, pop_ins_state)
-# Step 6: Calculate crude rates at the state level 
+
+# Step 3: Calculate crude rates at the state level 
 ins_rates_crude_state <- cases_by_insurance_state %>%
   group_by(State, Year) %>%
   summarise(
@@ -316,7 +320,7 @@ ins_rates_crude_state <- cases_by_insurance_state %>%
   ) %>%
   ungroup()
 
-# Step 7: Combine ins-specific rates, crude rates, and adjusted rates
+# Step 4: Combine ins-specific rates, crude rates, and adjusted rates
 final_rates_state_ins <- ins_rates_crude_state %>%
   left_join(ins_specific_rates_state, by = c("State", "Year"))
 
@@ -340,7 +344,8 @@ ins_specific_rates_year <- cases_by_insurance_year %>%
   ) %>%
   select(Year, `Insurance Type`, ins_specific_rate_acsc_y, ins_specific_rate_acute_y, 
          ins_specific_rate_chronic_y, ins_specific_rate_diabetes_y, pop_ins_year)
-# Step 6: Calculate crude rates at the year level 
+
+# Step 3: Calculate crude rates at the year level 
 ins_rates_crude_year <- cases_by_insurance_year %>%
   group_by(Year) %>%
   summarise(
@@ -351,7 +356,7 @@ ins_rates_crude_year <- cases_by_insurance_year %>%
   ) %>%
   ungroup()
 
-# Step 7: Combine ins-specific rates, crude rates, and adjusted rates
+# Step 4: Combine ins-specific rates, crude rates, and adjusted rates
 final_rates_year_ins <- ins_rates_crude_year %>%
   left_join(ins_specific_rates_year, by = c("Year"))
 
@@ -361,14 +366,6 @@ colnames(final_rates_county_ins)
 colnames(final_rates_state_ins)
 colnames(final_rates_year_ins)
 
-duplicates_county_ins <- final_rates_county_ins %>%
-  group_by(State, Year, `Insurance Type`) %>%
-  filter(n() > 1)
-
-
-duplicates_state_ins <- final_rates_state_ins %>%
-  group_by(State, Year, `Insurance Type`) %>%
-  filter(n() > 1)
 
 final_rates_county_ins_distinct <- final_rates_county_ins %>%
   distinct(County, State, Year, `Insurance Type`, .keep_all = TRUE)
@@ -377,9 +374,6 @@ final_rates_state_ins_distinct <- final_rates_state_ins %>%
 final_data_ins_rates <- final_rates_county_ins_distinct %>%
   left_join(final_rates_state_ins_distinct, by = c("State", "Year", "Insurance Type"))
 
-duplicates_year_ins <- final_rates_year_ins %>%
-  group_by( Year, `Insurance Type`) %>%
-  filter(n() > 1)
 
 final_rates_year_ins_distinct <- final_rates_year_ins %>%
   distinct(Year, `Insurance Type`, .keep_all = TRUE)
@@ -390,7 +384,7 @@ cleaned_data_ins_rates_fin<-final_data_ins_rates%>%
 save(cleaned_data_ins_rates_fin, file="cleaned_data_ins_final.RData")
 load("cleaned_data_ins_final.RData")
 
-#GRAPHS- years (TABLE 1)
+#GRAPHS
 #ACSC
 ggplot(cleaned_data_ins_rates_fin %>% 
          filter(!is.na(ins_specific_rate_acsc_s), !is.na(`Insurance Type`)), 
@@ -406,7 +400,6 @@ ggplot(cleaned_data_ins_rates_fin %>%
     color = "Insurance Category"
   )+
   theme_minimal()
-
 
 #ACUTE
 ggplot(cleaned_data_ins_rates_fin %>% 
@@ -424,7 +417,6 @@ ggplot(cleaned_data_ins_rates_fin %>%
   ) +
   theme_minimal()
 
-
 #CHRONIC
 ggplot(cleaned_data_ins_rates_fin %>% 
          filter(!is.na(ins_specific_rate_chronic_s), !is.na(`Insurance Type`)), 
@@ -440,7 +432,6 @@ ggplot(cleaned_data_ins_rates_fin %>%
     color = "Insurance Category"
   ) +
   theme_minimal()
-
 
 #DIABETES
 ggplot(cleaned_data_ins_rates_fin %>% 
@@ -458,8 +449,7 @@ ggplot(cleaned_data_ins_rates_fin %>%
   ) +
   theme_minimal()
 
-
-#Year total (TABLE 1)
+#Year total
 cleaned_data_ins_rates_fin%>% 
   filter(!is.na(ins_specific_rate_acsc_y), !is.na(`Insurance Type`))%>%
   filter(!is.na(ins_specific_rate_acute_y), !is.na(`Insurance Type`))%>%
@@ -487,12 +477,10 @@ cleaned_data_ins_rates_fin%>%
     axis.text.x = element_text(angle = 45, hjust = 1)  
   )
 
-##MERGE DATASETS 
+##MERGE DATASETS (TO MAIN ONE)
 cleaned_data_age_race_sex_ins_merged<-cleaned_data_age_race_sex_merged%>%
   left_join(cleaned_data_ins_rates_fin, by=c("GEOID","County","State","Year","Insurance Type"))
 save(cleaned_data_age_race_sex_ins_merged,file="cleaned_data_age_race_sex_ins_merged.RData")
-load("cleaned_data_age_race_sex_merged.RData")
-
 
 
 ##WORKING POPULATION (REMOVE AGE GROUP 65+)
@@ -519,7 +507,7 @@ raw_acs_insur_list_working <- lapply(years, function(acs_year) {
     survey = acs_survey,
     state = states,
     variables = b27010_(c(1, 18, 20:25, 27:34, 
-                          36:41, 43:50)) ###Removed under 18 and 65+ populations
+                          36:41, 43:50)) ###REMOVED UNDER 18 AND 0VER 65 POPULATION 
   )
   
   # Add the year to the dataset
@@ -626,6 +614,7 @@ cases_by_insurance_countyw <- cleaned_data_3w %>%
     Diabetes_Hosp = sum(`Diabetes Hospitalization`, na.rm = TRUE),
   ) %>%
   ungroup()
+
 # Step 2: Calculate insurance-specific rates
 ins_specific_ratesw <- cases_by_insurance_countyw %>%
   mutate( 
@@ -636,7 +625,8 @@ ins_specific_ratesw <- cases_by_insurance_countyw %>%
   ) %>%
   select(GEOID, County, State, Year, `Insurance Type`, ins_specific_rate_acsc_c, ins_specific_rate_acute_c, 
          ins_specific_rate_chronic_c, ins_specific_rate_diabetes_c, pop_ins)
-# Step 6: Calculate crude rates at the county level 
+
+# Step 3: Calculate crude rates at the county level 
 ins_rates_crudew <- cases_by_insurance_countyw %>%
   group_by(GEOID, County, State, Year) %>%
   summarise(
@@ -647,11 +637,11 @@ ins_rates_crudew <- cases_by_insurance_countyw %>%
   ) %>%
   ungroup()
 
-# Step 7: Combine ins-specific rates, crude rates, and adjusted rates
+# Step 4: Combine ins-specific rates, crude rates, and adjusted rates
 final_rates_county_insw <- ins_rates_crudew %>%
   left_join(ins_specific_ratesw, by = c("GEOID", "County", "State", "Year"))
 
-#YEAR
+#STATE AND YEAR
 # Create a list to store data
 raw_acs_insur_list_state_working <- lapply(years, function(acs_year) {
   # Use survey_used logic based on the year
@@ -741,7 +731,6 @@ cleaned_data_4w <- cleaned_data_3w %>%
   left_join(temp_insurance_state_working, by = c("State"="NAME","Year", "Insurance Type"="insurance_ses"))
 
 
-
 final_rates_insurance_state_distinct_working <- cleaned_data_4w %>%
   distinct(State, Year, `Insurance Type`, .keep_all = TRUE)
 
@@ -772,6 +761,7 @@ pop_ins_summaryw<-pop_ins_summaryw%>%
   rename(
     "GEOID"=GEOID.x
   )
+
 #Rate Calculations
 # Step 1: Calculate hospitalizations and insurance populations at the state level
 cases_by_insurance_statew <- pop_ins_summaryw %>%
@@ -783,6 +773,7 @@ cases_by_insurance_statew <- pop_ins_summaryw %>%
     Diabetes_Hosp = sum(`Diabetes Hospitalization`, na.rm = TRUE),
   ) %>%
   ungroup()
+
 # Step 2: Calculate insurance-specific rates
 ins_specific_rates_statew <- cases_by_insurance_statew %>%
   mutate( 
@@ -793,7 +784,8 @@ ins_specific_rates_statew <- cases_by_insurance_statew %>%
   ) %>%
   select(State, Year, `Insurance Type`, ins_specific_rate_acsc_s, ins_specific_rate_acute_s, 
          ins_specific_rate_chronic_s, ins_specific_rate_diabetes_s, pop_ins_state)
-# Step 6: Calculate crude rates at the state level 
+
+# Step 3: Calculate crude rates at the state level 
 ins_rates_crude_statew <- cases_by_insurance_statew %>%
   group_by(State, Year) %>%
   summarise(
@@ -804,10 +796,11 @@ ins_rates_crude_statew <- cases_by_insurance_statew %>%
   ) %>%
   ungroup()
 
-# Step 7: Combine ins-specific rates, crude rates, and adjusted rates
+# Step 4: Combine ins-specific rates, crude rates, and adjusted rates
 final_rates_state_insw <- ins_rates_crude_statew %>%
   left_join(ins_specific_rates_statew, by = c("State", "Year"))
 
+#YEAR DATA
 # Step 1: Calculate hospitalizations and insurance populations at the year level
 cases_by_insurance_yearw <- pop_ins_summaryw %>%
   group_by(Year, `Insurance Type`,pop_ins_year) %>% 
@@ -818,6 +811,7 @@ cases_by_insurance_yearw <- pop_ins_summaryw %>%
     Diabetes_Hosp = sum(`Diabetes Hospitalization`, na.rm = TRUE),
   ) %>%
   ungroup()
+
 # Step 2: Calculate insurance-specific rates
 ins_specific_rates_yearw <- cases_by_insurance_yearw %>%
   mutate( 
@@ -828,7 +822,8 @@ ins_specific_rates_yearw <- cases_by_insurance_yearw %>%
   ) %>%
   select(Year, `Insurance Type`, ins_specific_rate_acsc_y, ins_specific_rate_acute_y, 
          ins_specific_rate_chronic_y, ins_specific_rate_diabetes_y, pop_ins_year)
-# Step 6: Calculate crude rates at the year level 
+
+# Step 3: Calculate crude rates at the year level 
 ins_rates_crude_yearw <- cases_by_insurance_yearw %>%
   group_by(Year) %>%
   summarise(
@@ -839,7 +834,7 @@ ins_rates_crude_yearw <- cases_by_insurance_yearw %>%
   ) %>%
   ungroup()
 
-# Step 7: Combine ins-specific rates, crude rates, and adjusted rates
+# Step 4: Combine ins-specific rates, crude rates, and adjusted rates
 final_rates_year_insw <- ins_rates_crude_yearw %>%
   left_join(ins_specific_rates_yearw, by = c("Year"))
 
@@ -849,14 +844,6 @@ colnames(final_rates_county_insw)
 colnames(final_rates_state_insw)
 colnames(final_rates_year_insw)
 
-duplicates_county_insw <- final_rates_county_insw %>%
-  group_by(State, Year, `Insurance Type`) %>%
-  filter(n() > 1)
-
-
-duplicates_state_insw <- final_rates_state_insw %>%
-  group_by(State, Year, `Insurance Type`) %>%
-  filter(n() > 1)
 
 final_rates_county_ins_distinctw <- final_rates_county_insw %>%
   distinct(County, State, Year, `Insurance Type`, .keep_all = TRUE)
@@ -864,10 +851,6 @@ final_rates_state_ins_distinctw <- final_rates_state_insw %>%
   distinct(State, Year, `Insurance Type`, .keep_all = TRUE)
 final_data_ins_ratesw <- final_rates_county_ins_distinctw %>%
   left_join(final_rates_state_ins_distinctw, by = c("State", "Year", "Insurance Type"))
-
-duplicates_year_insw <- final_rates_year_insw %>%
-  group_by( Year, `Insurance Type`) %>%
-  filter(n() > 1)
 
 final_rates_year_ins_distinctw <- final_rates_year_insw %>%
   distinct(Year, `Insurance Type`, .keep_all = TRUE)
@@ -878,7 +861,7 @@ cleaned_data_ins_rates_finw<-final_data_ins_ratesw%>%
 save(cleaned_data_ins_rates_finw, file="cleaned_data_ins_finalw.RData")
 load("cleaned_data_ins_finalw.RData")
 
-#GRAPHS- years (TABLE 1)
+#GRAPHS
 #ACSC
 ggplot(cleaned_data_ins_rates_finw %>% 
          filter(!is.na(ins_specific_rate_acsc_s), !is.na(`Insurance Type`)), 
@@ -894,7 +877,6 @@ ggplot(cleaned_data_ins_rates_finw %>%
     color = "Insurance Category"
   ) +
   theme_minimal()
-
 
 #ACUTE
 ggplot(cleaned_data_ins_rates_finw %>% 
@@ -912,7 +894,6 @@ ggplot(cleaned_data_ins_rates_finw %>%
   ) +
   theme_minimal()
 
-
 #CHRONIC
 ggplot(cleaned_data_ins_rates_finw %>% 
          filter(!is.na(ins_specific_rate_chronic_s), !is.na(`Insurance Type`)), 
@@ -928,7 +909,6 @@ ggplot(cleaned_data_ins_rates_finw %>%
     color = "Insurance Category"
   ) +
   theme_minimal()
-
 
 #DIABETES
 ggplot(cleaned_data_ins_rates_finw %>% 
@@ -946,8 +926,7 @@ ggplot(cleaned_data_ins_rates_finw %>%
   ) +
   theme_minimal()
 
-
-#Year total (TABLE 1)
+#Year total
 cleaned_data_ins_rates_finw%>% 
   filter(!is.na(ins_specific_rate_acsc_y), !is.na(`Insurance Type`))%>%
   filter(!is.na(ins_specific_rate_acute_y), !is.na(`Insurance Type`))%>%
@@ -975,8 +954,7 @@ cleaned_data_ins_rates_finw%>%
     axis.text.x = element_text(angle = 45, hjust = 1)  
   )
 
-##MERGE DATASETS 
+##MERGE DATASETS TO MAIN DATASET
 cleaned_data_age_race_sex_ins_mergedw<-cleaned_data_age_race_sex_mergedw%>%
   left_join(cleaned_data_ins_rates_finw, by=c("GEOID","County","State","Year","Insurance Type"))
 save(cleaned_data_age_race_sex_ins_mergedw,file="cleaned_data_age_race_sex_ins_mergedw.RData")
-load("cleaned_data_age_race_sex_mergedw.RData")

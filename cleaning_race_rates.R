@@ -10,7 +10,7 @@ library(scales)
 library(openxlsx)
 
 load("cleaned_data_age_merged.RData")
-ls()
+
 ###RACE RATES
 #CLEAN DATASET
 cleaned_merged_data_race<-cleaned_merged_final%>%
@@ -50,7 +50,8 @@ race_specific_rates <- cases_by_race_county %>%
   ) %>%
   select(GEOID, County, State, Year, Race, race_specific_rate_acsc_c, race_specific_rate_acute_c, 
          race_specific_rate_chronic_c, race_specific_rate_diabetes_c, race_population_county)
-# Step 6: Calculate crude rates at the county level (using total_age_population)
+
+# Step 3: Calculate crude rates at the county level
 race_rates_crude <- cases_by_race_county %>%
   group_by(GEOID, County, State, Year) %>%
   summarise(
@@ -61,7 +62,7 @@ race_rates_crude <- cases_by_race_county %>%
   ) %>%
   ungroup()
 
-# Step 7: Combine age-specific rates, crude rates, and adjusted rates
+# Step 4: Combine age-specific rates, crude rates, and adjusted rates
 final_rates_county_race <- race_rates_crude %>%
   left_join(race_specific_rates, by = c("GEOID", "County", "State", "Year"))
 final_rates_county_race=final_rates_county_race%>%
@@ -91,7 +92,8 @@ race_specific_rates_state <- state_data_race %>%
   select(State, Year, Race, Race_specific_rate_acsc_s, Race_specific_rate_acute_s, 
          Race_specific_rate_chronic_s, Race_specific_rate_diabetes_s, 
          race_population_state)
-# Step 6: Calculate crude rates at the state level
+
+# Step 3: Calculate crude rates at the state level
 race_rates_crude_state <- state_data_race %>%
   group_by(State, Year) %>%
   summarise(
@@ -102,7 +104,7 @@ race_rates_crude_state <- state_data_race %>%
   ) %>%
   ungroup()
 
-# Step 7: Merge the final results into one data frame
+# Step 4: Merge the final results into one data frame
 final_rates_state_race <- race_rates_crude_state %>%
   left_join(race_specific_rates_state, by = c("State", "Year"))
 final_rates_state_race <- final_rates_state_race %>%
@@ -119,6 +121,7 @@ year_data_race<- merged_data_yearfin%>%
     Acute_Hosp = sum(`Acute Hospitalization`, na.rm = TRUE),
     Chronic_Hosp = sum(`Chronic Hospitalization`, na.rm = TRUE),
     Diabetes_Hosp = sum(`Diabetes Hospitalization`, na.rm = TRUE))%>% ungroup
+
 # Step 2: Calculate age-specific rates for each year
 race_specific_rates_year<-year_data_race %>%
   mutate( 
@@ -131,7 +134,7 @@ race_specific_rates_year<-year_data_race %>%
          Race_specific_rate_chronic_y, Race_specific_rate_diabetes_y, 
          race_population_year)
 
-# Step 6: Calculate crude rates at the year level
+# Step 3: Calculate crude rates at the year level
 race_rates_crude_year <- year_data_race %>%
   group_by(Year) %>%
   summarise(
@@ -142,7 +145,7 @@ race_rates_crude_year <- year_data_race %>%
   ) %>%
   ungroup()
 
-# Step 7: Merge the final results into one data frame
+# Step 4: Merge the final results into one data frame
 final_rates_year_race <- race_rates_crude_year %>%
   left_join(race_specific_rates_year, by = c("Year"))
 final_rates_year_race <- final_rates_year_race %>%
@@ -156,25 +159,12 @@ colnames(final_rates_county_race)
 colnames(final_rates_state_race)
 colnames(final_rates_year_race)
 
-duplicates_county_race <- final_rates_county_race %>%
-  group_by(State, Year, Race) %>%
-  filter(n() > 1)
-
-
-duplicates_state_race <- final_rates_state_race %>%
-  group_by(State, Year, Race) %>%
-  filter(n() > 1)
-
 final_rates_county_race_distinct <- final_rates_county_race %>%
   distinct(County, State, Year, Race, .keep_all = TRUE)
 final_rates_state_race_distinct <- final_rates_state_race %>%
   distinct(State, Year, Race, .keep_all = TRUE)
 final_data_race_rates <- final_rates_county_race_distinct %>%
   left_join(final_rates_state_race_distinct, by = c("State", "Year", "Race"))
-
-duplicates_year_race <- final_rates_year_race %>%
-  group_by( Year, Race) %>%
-  filter(n() > 1)
 
 final_rates_year_race_distinct <- final_rates_year_race %>%
   distinct(Year, Race, .keep_all = TRUE)
@@ -183,7 +173,7 @@ cleaned_data_race_rates_fin<-final_data_race_rates%>%
   left_join(final_rates_year_race_distinct, by=c("Year","Race"))
 
 save(cleaned_data_race_rates_fin, file="cleaned_data_race_final.RData")
-load("cleaned_data_race_final.RData")
+
 #WORKING POPULATION
 cleaned_merged_data_racew<-cleaned_merged_final%>%
   filter(`Age Cat.`%in% c("18-29","30-44","45-66"))%>%
@@ -235,7 +225,8 @@ race_specific_ratesw <- cases_by_race_countyw %>%
   ) %>%
   select(GEOID, County, State, Year, Race, race_specific_rate_acsc_c, race_specific_rate_acute_c, 
          race_specific_rate_chronic_c, race_specific_rate_diabetes_c, race_population_county)
-# Step 6: Calculate crude rates at the county level (using total_age_population)
+
+# Step 3: Calculate crude rates at the county level (using total_age_population)
 race_rates_crudew <- cases_by_race_countyw %>%
   group_by(GEOID, County, State, Year) %>%
   summarise(
@@ -246,14 +237,13 @@ race_rates_crudew <- cases_by_race_countyw %>%
   ) %>%
   ungroup()
 
-# Step 7: Combine age-specific rates, crude rates, and adjusted rates
+# Step 4: Combine age-specific rates, crude rates, and adjusted rates
 final_rates_county_racew<- race_rates_crudew %>%
   left_join(race_specific_ratesw, by = c("GEOID", "County", "State", "Year"))
 final_rates_county_racew=final_rates_county_racew%>%
   select(
     -race_population_county
   )
-
 
 ##RACE-SPECIFIC FOR EACH STATE
 # Step 1: Aggregate hospitalizations and age populations at state level
@@ -276,7 +266,8 @@ race_specific_rates_statew <- state_data_racew %>%
   select(State, Year, Race, Race_specific_rate_acsc_s, Race_specific_rate_acute_s, 
          Race_specific_rate_chronic_s, Race_specific_rate_diabetes_s, 
          race_population_state)
-# Step 6: Calculate crude rates at the state level
+
+# Step 3: Calculate crude rates at the state level
 race_rates_crude_statew <- state_data_racew %>%
   group_by(State, Year) %>%
   summarise(
@@ -287,7 +278,7 @@ race_rates_crude_statew <- state_data_racew %>%
   ) %>%
   ungroup()
 
-# Step 7: Merge the final results into one data frame
+# Step 4: Merge the final results into one data frame
 final_rates_state_racew <- race_rates_crude_statew %>%
   left_join(race_specific_rates_statew, by = c("State", "Year"))
 final_rates_state_racew <- final_rates_state_racew %>%
@@ -304,6 +295,7 @@ year_data_racew<- cleaned_merged_data_racew%>%
     Acute_Hosp = sum(`Acute Hospitalization`, na.rm = TRUE),
     Chronic_Hosp = sum(`Chronic Hospitalization`, na.rm = TRUE),
     Diabetes_Hosp = sum(`Diabetes Hospitalization`, na.rm = TRUE))%>% ungroup
+
 # Step 2: Calculate age-specific rates for each year
 race_specific_rates_yearw<-year_data_racew %>%
   mutate( 
@@ -316,7 +308,7 @@ race_specific_rates_yearw<-year_data_racew %>%
          Race_specific_rate_chronic_y, Race_specific_rate_diabetes_y, 
          race_population_year)
 
-# Step 6: Calculate crude rates at the year level
+# Step 3: Calculate crude rates at the year level
 race_rates_crude_yearw <- year_data_racew %>%
   group_by(Year) %>%
   summarise(
@@ -327,7 +319,7 @@ race_rates_crude_yearw <- year_data_racew %>%
   ) %>%
   ungroup()
 
-# Step 7: Merge the final results into one data frame
+# Step 4: Merge the final results into one data frame
 final_rates_year_racew<- race_rates_crude_yearw %>%
   left_join(race_specific_rates_yearw, by = c("Year"))
 final_rates_year_racew <- final_rates_year_racew %>%
@@ -341,25 +333,12 @@ colnames(final_rates_county_racew)
 colnames(final_rates_state_racew)
 colnames(final_rates_year_racew)
 
-duplicates_county_racew <- final_rates_county_racew %>%
-  group_by(State, Year, Race) %>%
-  filter(n() > 1)
-
-
-duplicates_state_racew <- final_rates_state_racew %>%
-  group_by(State, Year, Race) %>%
-  filter(n() > 1)
-
 final_rates_county_race_distinctw<- final_rates_county_racew %>%
   distinct(County, State, Year, Race, .keep_all = TRUE)
 final_rates_state_race_distinctw <- final_rates_state_racew%>%
   distinct(State, Year, Race, .keep_all = TRUE)
 final_data_race_ratesw <- final_rates_county_race_distinctw %>%
   left_join(final_rates_state_race_distinctw, by = c("State", "Year", "Race"))
-
-duplicates_year_racew <- final_rates_year_racew %>%
-  group_by( Year, Race) %>%
-  filter(n() > 1)
 
 final_rates_year_race_distinctw <- final_rates_year_racew %>%
   distinct(Year, Race, .keep_all = TRUE)
@@ -368,7 +347,8 @@ cleaned_data_race_rates_finw<-final_data_race_ratesw%>%
   left_join(final_rates_year_race_distinctw, by=c("Year","Race"))
 
 save(cleaned_data_race_rates_finw, file="cleaned_data_race_finalw.RData")
-load("cleaned_data_race_finalw.RData")
+
+
 
 #GRAPHS- years (TABLE 1)
 #ACSC
@@ -402,7 +382,6 @@ ggplot(cleaned_data_race_rates_finw %>%
   ) +
   theme_minimal()
 
-
 #ACUTE
 ggplot(cleaned_data_race_rates_fin %>% 
          filter(!is.na(Race_specific_rate_acute_s), !is.na(Race)), 
@@ -433,7 +412,6 @@ ggplot(cleaned_data_race_rates_finw %>%
     color = "Race Category",
   ) +
   theme_minimal()
-
 
 #CHRONIC
 ggplot(cleaned_data_race_rates_fin %>% 
@@ -497,7 +475,7 @@ ggplot(cleaned_data_race_rates_finw %>%
   ) +
   theme_minimal()
 
-#Year total (TABLE 1)
+#Year total
 cleaned_data_race_rates_fin%>% 
   filter(!is.na(Race_specific_rate_acsc_y), !is.na(Race))%>%
   filter(!is.na(Race_specific_rate_acute_y), !is.na(Race))%>%
